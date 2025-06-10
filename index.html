@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>掲示板</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>掲示板</h1>
+
+        <div class="info-section">
+            <p>新規さんへ、まずは挨拶をしましょう。パスワードは自分のIDを決めるものでパスワードのようなものじゃなくてパスワードです。</p>
+            <p>今の話題に勇気を出して参加してみましょう！！！</p>
+            <p>猫派だけ下ネタOKだよ</p>
+            <p>全数字垢がほしいならパスワードを7かなんかにしとけください<span class="highlight">(@7902699)</span></p>
+            <p>IDが<span class="highlight-red">赤い</span>人はゆゆゆゆが選んだ人(運営)です。</p>
+            <p>運営だからだと言ってなにか特別なことができるわけじゃありません。</p>
+            <p class="forgot-password"><a href="#">最近パスワードを忘れる人が</a></p>
+        </div>
+
+        <div class="post-form-section">
+            <div class="tabs">
+                <span class="tab-item active">使い方</span>
+                <span class="tab-item">トピック変更</span>
+                <span class="tab-item">投稿削除</span>
+            </div>
+            <div class="post-form-content">
+                <textarea id="content" placeholder="内容"></textarea>
+                <input type="text" id="name" placeholder="名前">
+                <input type="password" id="pass" placeholder="パスワード">
+                <button id="submitPost">送信</button>
+            </div>
+        </div>
+
+        <h2>投稿</h2>
+        <div class="posts-list">
+            <table>
+                <thead>
+                    <tr>
+                        <th>番号</th>
+                        <th>名前</th>
+                        <th>ID</th>
+                        <th>内容</th>
+                        <th>日時</th>
+                    </tr>
+                </thead>
+                <tbody id="postsTableBody">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
