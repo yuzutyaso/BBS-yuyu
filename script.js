@@ -15,12 +15,18 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            const posts = await response.json();
+            const data = await response.json(); // トップレベルのオブジェクトを取得
 
-            // 投稿を番号の降順にソート（新しい投稿が上に来るように）
-            // APIからのデータ形式が不明なため、ここでは`number`プロパティがあることを仮定
-            // もしAPIが配列を返すなら、そのまま利用
-            const sortedPosts = Array.isArray(posts) ? posts.sort((a, b) => b.number - a.number) : [];
+            // 'posts' 配列が存在するか確認
+            const posts = Array.isArray(data.posts) ? data.posts : [];
+
+            // 投稿を日時 (time) の新しい順にソート
+            // timeプロパティは"YYYY/MM/DD HH:MM:SS"形式なので、Dateオブジェクトに変換して比較
+            const sortedPosts = [...posts].sort((a, b) => {
+                const dateA = new Date(a.time);
+                const dateB = new Date(b.time);
+                return dateB.getTime() - dateA.getTime(); // 降順 (新しいものが先)
+            });
 
             postsTableBody.innerHTML = ''; // 既存の投稿をクリア
 
@@ -31,19 +37,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
             sortedPosts.forEach(post => {
                 const row = postsTableBody.insertRow();
-                // 投稿オブジェクトのプロパティ名はAPIのJSON構造に合わせてください。
-                // 例: post.number, post.name, post.id, post.content, post.datetime
-                // 現状のAPIレスポンスの具体的なJSON形式が不明なため、推測に基づいています。
-                // スクリーンショットを元に以下を仮定: number, name, id, content, datetime
-                row.insertCell().textContent = post.number || 'N/A'; // 番号
-                row.insertCell().textContent = post.name || '名無し'; // 名前
-                row.insertCell().textContent = post.id || 'N/A'; // ID
-                row.insertCell().textContent = post.content || ''; // 内容
-                row.insertCell().textContent = post.datetime || '日時不明'; // 日時
+                // 'no' プロパティがない場合も考慮 (新しい投稿にはない可能性)
+                row.insertCell().textContent = post.no !== undefined ? post.no : '';
+                row.insertCell().textContent = post.name || '名無し';
+
+                // IDに@が含まれていなければ追加
+                const displayId = post.id ? (post.id.startsWith('@') ? post.id : `@${post.id}`) : 'N/A';
+                row.insertCell().textContent = displayId;
+
+                row.insertCell().textContent = post.content || '';
+                row.insertCell().textContent = post.time || '日時不明';
             });
         } catch (error) {
             console.error("投稿の取得中にエラーが発生しました:", error);
-            postsTableBody.innerHTML = '<tr><td colspan="5" style="color: red;">投稿の読み込みに失敗しました。</td></tr>';
+            postsTableBody.innerHTML = '<tr><td colspan="5" style="color: red;">投稿の読み込みに失敗しました。ネットワーク接続を確認するか、APIが利用可能か確認してください。</td></tr>';
         }
     }
 
@@ -76,29 +83,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             // POSTリクエストを送信
-            // APIがクエリパラメータでのPOSTを受け付けているとのことなので、その形式に従います。
-            // 通常のREST APIでは、POSTリクエストのデータはリクエストボディにJSON形式などで含めます。
-            // しかし、指示が「name=[名前]&pass=[パスワード]&content=[内容] にPOSTリクエスト」なので、そのようにします。
+            // APIの指示に従い、POSTデータをクエリパラメータとして送信します。
             const response = await fetch(postUrl, {
                 method: 'POST',
-                // headers: {
-                //     'Content-Type': 'application/json' // APIがJSONボディを期待する場合は必要
-                // },
-                // body: JSON.stringify({ // APIがJSONボディを期待する場合
-                //     name: name,
-                //     pass: pass,
-                //     content: content
-                // })
+                // body: には何も入れない（データはURLに含めているため）
+                // headers: {} (特にContent-Typeを設定する必要はないが、APIがJSONボディを期待する場合は設定)
             });
 
             if (!response.ok) {
-                // CORSエラーの場合はここで捕捉できない可能性がある
-                // ネットワークエラーやサーバーからの不正なレスポンスの場合
+                // HTTPステータスが200番台以外の場合
+                // CORSエラーの場合は、このブロックに入る前にネットワークエラーとして処理されることが多い
                 const errorText = await response.text();
-                throw new Error(`投稿に失敗しました: ${response.status} ${response.statusText} - ${errorText}`);
+                // サーバーからの具体的なエラーメッセージがあれば表示
+                let errorMessage = `投稿に失敗しました: HTTPステータス ${response.status} ${response.statusText}`;
+                if (errorText) {
+                    try {
+                        const errorJson = JSON.parse(errorText);
+                        errorMessage += ` - ${errorJson.message || errorJson.error || errorText}`;
+                    } catch (e) {
+                        errorMessage += ` - ${errorText}`;
+                    }
+                }
+                throw new Error(errorMessage);
             }
 
-            const result = await response.json(); // APIからのレスポンスをJSONとしてパース
+            // APIが成功時に何を返すか不明ですが、一旦JSONとしてパースを試みます
+            const result = await response.json().catch(() => ({ message: "投稿成功 (レスポンスボディなし)" })); // JSONでない場合も考慮
             console.log("投稿成功:", result);
             alert('投稿が完了しました！');
 
@@ -107,16 +117,17 @@ document.addEventListener('DOMContentLoaded', () => {
             passInput.value = '';
             contentInput.value = '';
             lastPostTime = currentTime; // 最後の投稿時刻を更新
-            fetchAndDisplayPosts(); // 投稿リストを再読み込み
+            await fetchAndDisplayPosts(); // 投稿リストを再読み込み (awaitで完了を待つ)
         } catch (error) {
             console.error("投稿中にエラーが発生しました:", error);
-            alert(`投稿中にエラーが発生しました。\n${error.message}\nブラウザの開発者ツール（F12キー）のConsoleタブも確認してください。`);
+            // CORSエラーはここで "Failed to fetch" や "Network request failed" などと表示されることが多い
+            alert(`投稿中にエラーが発生しました。\n${error.message}\nブラウザの開発者ツール（F12キー）のConsoleタブで詳細を確認してください。\nCORS (クロスオリジン) の問題の可能性があります。`);
         }
     });
 
     // ページロード時に投稿を取得して表示
     fetchAndDisplayPosts();
 
-    // 5秒ごとに投稿を自動更新（任意）
+    // 5秒ごとに投稿を自動更新
     setInterval(fetchAndDisplayPosts, 5000);
 });
